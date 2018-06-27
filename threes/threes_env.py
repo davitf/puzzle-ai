@@ -2,21 +2,21 @@
 
 See the basic mechanics at https://en.wikipedia.org/wiki/Threes .
 
-The details of how the future pieces are chosen come from
+The details of how the future tiles are chosen come from
 https://toucharcade.com/community/threads/218248/page-27#post-3140044
 with a few differences on how special future cards work, based on analyzing the
 source of the web-based version at http://play.threesgame.com/ .
 
 Differences in scoring:
 
-The original game simply adds up the total value of all the pieces in the board
+The original game simply adds up the total value of all the tiles in the board
 when a game ends. Since here we need to compute a reward for each move, the
 straightforward approach would be to define the reward of a move as the
 difference between the total value of the board before and after it, which is
-equivalent to (value of pieces created from merging - value of the pieces which
-were merged + value of the new added piece).
+equivalent to (value of tiles created from merging - value of the tiles which
+were merged + value of the new added tile).
 
-However, as the added piece is chosen randomly outside of the agent's control,
+However, as the added tile is chosen randomly outside of the agent's control,
 I chose to ignore its value when computing the step reward, to reduce variance
 during learning. Thus the scoring in this version comes only from the merges
 performed by the agent, and will be lower than the original game.
@@ -31,8 +31,8 @@ from threes import threes_render
 from threes.randomized_order_iter import randomized_order_iter
 
 # The game state provided by the environment is a one-dimensional array of ints,
-# containing the type of the current pieces in all spaces in the board, plus the
-# type of the next piece.
+# containing the type of the current tiles in all spaces in the board, plus the
+# type of the next tile.
 #
 # I.e. for a 4x4 board:
 #
@@ -45,32 +45,32 @@ from threes.randomized_order_iter import randomized_order_iter
 #
 # The state is [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q]
 #
-# When the next piece is a "special" one (i.e. not 1, 2 or 3), the player is
+# When the next tile is a "special" one (i.e. not 1, 2 or 3), the player is
 # given up to three possibilities as to what it may be; in this case, the state
-# contains only the highest possibility, and the actual piece will be it or one
+# contains only the highest possibility, and the actual tile will be it or one
 # of the two immediately lower ones, but always at least a 6 (i.e. if "q" in the
-# state above is PIECE_12, the actual piece might be PIECE_6 or PIECE_12; for a
-# PIECE_192, the actual one might be PIECE_48, PIECE_96 or PIECE_192).
+# state above is TILE_12, the actual tile might be TILE_6 or TILE_12; for a
+# TILE_192, the actual one might be TILE_48, TILE_96 or TILE_192).
 
 from threes.threes_util import (
-    PIECE_1,
-    PIECE_2,
-    PIECE_3,
-    PIECE_24,
-    PIECE_48,
+    TILE_1,
+    TILE_2,
+    TILE_3,
+    TILE_24,
+    TILE_48,
     NUM_FEATURES,
     NUM_ACTIONS,
     is_game_over,
     move_board,
-    future_piece_possibilities,
+    future_tile_possibilities,
 )
 
 
-# How often a special piece (not 1, 2 or 3) appears: one per 21 moves.
-SPECIAL_PIECE_FREQUENCY = 21
+# How often a special tile (not 1, 2 or 3) appears: one per 21 moves.
+SPECIAL_TILE_FREQUENCY = 21
 
-# How many pieces are placed in the board when the game starts.
-INITIAL_PIECES_IN_BOARD = 9
+# How many tiles are placed in the board when the game starts.
+INITIAL_TILES_IN_BOARD = 9
 
 
 class ThreesGame(gym.Env):
@@ -82,24 +82,24 @@ class ThreesGame(gym.Env):
     # observation_space depends on board_size, which is set for each instance.
     # observation_space = gym.spaces.MultiDiscrete([NUM_FEATURES] * STATE_SIZE)
 
-    def __init__(self, board_size=4, high_pieces=None):
+    def __init__(self, board_size=4, high_tiles=None):
         """Initialize the environment.
 
-        :param board_size: How many pieces on each side of the board.
-        :param high_pieces: Optional list of possible pieces to add to the board
+        :param board_size: How many tiles on each side of the board.
+        :param high_tiles: Optional list of possible tiles to add to the board
             when the game starts (always on the top left corner). One value will
             be chosen randomly for each game. This can also be a single value,
             which will be used for all games.
         """
         self.board_size = board_size
-        # Convert high_piece to a one-element list if it is not a list.
-        self.high_pieces = (
-            high_pieces if hasattr(high_pieces, "__len__") else [high_pieces]
+        # Convert high_tile to a one-element list if it is not a list.
+        self.high_tiles = (
+            high_tiles if hasattr(high_tiles, "__len__") else [high_tiles]
         )
 
-        self.board_area = board_size * board_size  # Number of pieces in the board.
+        self.board_area = board_size * board_size  # Number of tiles in the board.
 
-        self.state_size = self.board_area + 1  # All pieces in the board + next piece.
+        self.state_size = self.board_area + 1  # All tiles in the board + next tile.
         self.observation_space = gym.spaces.MultiDiscrete(
             [NUM_FEATURES] * self.state_size
         )
@@ -111,7 +111,7 @@ class ThreesGame(gym.Env):
         self.reset()
 
     def _create_arrays(self):
-        # Create the board and future_piece arrays, which share a base with state.
+        # Create the board and future_tile arrays, which share a base with state.
 
         # The contents of the board are stored as a flattened array in the
         # first elements of the state.
@@ -119,9 +119,9 @@ class ThreesGame(gym.Env):
             (self.board_size, self.board_size)
         )
 
-        # The future piece is stores in the last element of the state.
-        self._future_piece_arr = self.state[self.board_area :]
-        assert len(self._future_piece_arr) == 1
+        # The future tile is stores in the last element of the state.
+        self._future_tile_arr = self.state[self.board_area :]
+        assert len(self._future_tile_arr) == 1
 
     def __setstate__(self, class_state):
         # Called when unpickling. Needed for calling _create_arrays after
@@ -133,27 +133,27 @@ class ThreesGame(gym.Env):
         self._create_arrays()
 
     @property
-    def future_piece(self):
-        return self._future_piece_arr[0]
+    def future_tile(self):
+        return self._future_tile_arr[0]
 
-    @future_piece.setter
-    def future_piece(self, future_piece):
-        self._future_piece_arr[0] = future_piece
+    @future_tile.setter
+    def future_tile(self, future_tile):
+        self._future_tile_arr[0] = future_tile
 
     def reset(self):
-        # Initialize the next-piece queues.
-        self.next_piece_queue = randomized_order_iter(
-            [PIECE_1, PIECE_2, PIECE_3] * 4, self.np_random
+        # Initialize the next-tile queues.
+        self.next_tile_queue = randomized_order_iter(
+            [TILE_1, TILE_2, TILE_3] * 4, self.np_random
         )
 
-        # A queue is also used for deciding when to output special pieces
+        # A queue is also used for deciding when to output special tiles
         # (in play.threesgame.com).
         self.special_queue = randomized_order_iter(
-            [True] + [False] * (SPECIAL_PIECE_FREQUENCY - 1), self.np_random
+            [True] + [False] * (SPECIAL_TILE_FREQUENCY - 1), self.np_random
         )
 
-        self.init_board()
-        self.choose_future_piece_display()
+        self._init_board()
+        self._choose_future_tile_in_state()
         self.total_score = 0
 
         return self.state
@@ -162,7 +162,7 @@ class ThreesGame(gym.Env):
         if close:
             return
 
-        rendered = threes_render.render_ansi(self.board, self.future_piece)
+        rendered = threes_render.render_ansi(self.board, self.future_tile)
 
         if mode == "ansi":
             return rendered
@@ -175,40 +175,40 @@ class ThreesGame(gym.Env):
     def seed(self, seed):
         self.np_random, seed = gym.utils.seeding.np_random(seed)
 
-    def init_board(self):
-        """Creates a new-game board with the pre-populated pieces."""
-        board = [0] * (self.board_area - INITIAL_PIECES_IN_BOARD)
+    def _init_board(self):
+        """Creates a new-game board with the pre-populated tiles."""
+        board = [0] * (self.board_area - INITIAL_TILES_IN_BOARD)
 
-        for _ in range(INITIAL_PIECES_IN_BOARD - bool(self.high_pieces)):
-            board.append(next(self.next_piece_queue))
+        for _ in range(INITIAL_TILES_IN_BOARD - bool(self.high_tiles)):
+            board.append(next(self.next_tile_queue))
         self.np_random.shuffle(board)
 
-        if self.high_pieces:
-            high_piece = self.np_random.choice(self.high_pieces)
-            board = [high_piece] + board
+        if self.high_tiles:
+            high_tile = self.np_random.choice(self.high_tiles)
+            board = [high_tile] + board
 
         self.state[: self.board_area] = board
 
-    def choose_future_piece_display(self):
-        highest_piece = np.max(self.board)
-        is_special = highest_piece >= PIECE_48 and next(self.special_queue)
+    def _choose_future_tile_in_state(self):
+        highest_tile = np.max(self.board)
+        is_special = highest_tile >= TILE_48 and next(self.special_queue)
         if not is_special:
-            self.future_piece = next(self.next_piece_queue)
+            self.future_tile = next(self.next_tile_queue)
             return
 
-        max_special_piece = highest_piece - 3
+        max_special_tile = highest_tile - 3
 
-        # Here we choose only the high limit of the next piece.
-        if max_special_piece <= PIECE_24:
-            self.future_piece = max_special_piece
+        # Here we choose only the high limit of the next tile.
+        if max_special_tile <= TILE_24:
+            self.future_tile = max_special_tile
         else:
-            self.future_piece = self.np_random.randint(PIECE_24, max_special_piece + 1)
+            self.future_tile = self.np_random.randint(TILE_24, max_special_tile + 1)
 
-    def choose_piece_to_add(self):
-        possible_pieces = future_piece_possibilities(self.future_piece)
-        if len(possible_pieces) == 1:
-            return possible_pieces[0]
-        return self.np_random.choice(possible_pieces)
+    def choose_tile_to_add(self):
+        possible_tiles = future_tile_possibilities(self.future_tile)
+        if len(possible_tiles) == 1:
+            return possible_tiles[0]
+        return self.np_random.choice(possible_tiles)
 
     def step(self, action):
         """Performs a step.
@@ -216,12 +216,12 @@ class ThreesGame(gym.Env):
         Raises: IllegalMoveError
         """
         # Perform the board movement.
-        piece_to_add = self.choose_piece_to_add()
-        score_delta = move_board(self.board, action, piece_to_add, self.np_random)
+        tile_to_add = self.choose_tile_to_add()
+        score_delta = move_board(self.board, action, tile_to_add, self.np_random)
         self.total_score += score_delta
 
-        # Choose the future piece to be included in the state.
-        self.choose_future_piece_display()
+        # Choose the future tile to be included in the state.
+        self._choose_future_tile_in_state()
 
         game_over = is_game_over(self.board)
         return (self.state, score_delta, game_over, {})

@@ -19,14 +19,14 @@ SAMPLE_LINES_BOTH_DIRECTIONS = [
     ([1, 2, 1, 2], [3, 1, 2, 0], [0, 1, 2, 3]),
     ([1, 2, 1, 5], [3, 1, 5, 0], [0, 1, 3, 5]),
     ([0, 1, 2, 3], [1, 2, 3, 0], [0, 0, 3, 3]),
-    # Merge two equal 3+ pieces.
+    # Merge two equal 3+ tiles.
     ([2, 2, 3, 3], [2, 2, 4, 0], [0, 2, 2, 4]),
     ([4, 4, 0, 1], [5, 0, 1, 0], [0, 4, 4, 1]),
     ([2, 8, 8, 8], [2, 9, 8, 0], [0, 2, 8, 9]),
     # Two 1s or 2s cannot be merged.
     ([2, 2, 4, 3], [2, 2, 4, 3], [2, 2, 4, 3]),
     ([4, 1, 1, 3], [4, 1, 1, 3], [4, 1, 1, 3]),
-    # Non-contiguous pieces cannot be merged.
+    # Non-contiguous tiles cannot be merged.
     ([2, 4, 2, 4], [2, 4, 2, 4], [2, 4, 2, 4]),
     ([2, 3, 1, 4], [2, 3, 1, 4], [2, 3, 1, 4]),
 ]
@@ -61,7 +61,7 @@ def test_move_line_left(input, output):
 
 
 # A sample Threes board, with the result of moving it in each direction.
-# In the result boards, the possible spots where a new piece can be placed are
+# In the result boards, the possible spots where a new tile can be placed are
 # marked with -1 values.
 # This board cannot be moved up.
 SAMPLE_BOARD = [[3, 4, 7, 4], [1, 2, 3, 0], [4, 5, 0, 0], [1, 1, 0, 0]]
@@ -85,14 +85,14 @@ class FakeRandom(object):
         return self.return_value
 
 
-def generate_next_piece_boards(board, new_piece):
-    possible_new_piece_places = np.argwhere(board == -1)
+def generate_next_tile_boards(board, new_tile):
+    possible_new_tile_places = np.argwhere(board == -1)
     new_boards = []
 
-    for new_piece_location in possible_new_piece_places:
+    for new_tile_location in possible_new_tile_places:
         new_board = board.copy()
         new_board[board == -1] = 0
-        new_board[tuple(new_piece_location)] = new_piece
+        new_board[tuple(new_tile_location)] = new_tile
         new_boards.append(new_board.tolist())
 
     return new_boards
@@ -111,10 +111,10 @@ def test_move_board(orig_board, expected_board, direction):
     expected_board = np.array(expected_board)
 
     # Generate the possible new boards. In each one, one of the -1s is replaced
-    # by the new piece (which we're hardcoding to 10), and the others by 0s
+    # by the new tile (which we're hardcoding to 10), and the others by 0s
     # (empty spaces).
     num_new_boards = np.sum(expected_board == -1)
-    expected_new_boards = generate_next_piece_boards(expected_board, 10)
+    expected_new_boards = generate_next_tile_boards(expected_board, 10)
     assert num_new_boards == len(expected_new_boards)
 
     # If there are no new boards, this is an illegal move, which is tested
@@ -153,3 +153,29 @@ def test_move_board_illegal_action():
 
     # Ensure that an illegal move does not change the input array.
     assert np.all(board == SAMPLE_BOARD)
+
+
+@pytest.mark.parametrize(
+    "max_tile, possible_tiles",
+    [
+        (threes_util.TILE_1, [threes_util.TILE_1]),
+        (threes_util.TILE_2, [threes_util.TILE_2]),
+        (threes_util.TILE_3, [threes_util.TILE_3]),
+        (threes_util.TILE_6, [threes_util.TILE_6]),
+        (threes_util.TILE_12, [threes_util.TILE_6, threes_util.TILE_12]),
+        (
+            threes_util.TILE_24,
+            [threes_util.TILE_6, threes_util.TILE_12, threes_util.TILE_24],
+        ),
+        (
+            threes_util.TILE_48,
+            [threes_util.TILE_12, threes_util.TILE_24, threes_util.TILE_48],
+        ),
+        (
+            threes_util.TILE_384,
+            [threes_util.TILE_96, threes_util.TILE_192, threes_util.TILE_384],
+        ),
+    ],
+)
+def test_future_tile_possibilities(max_tile, possible_tiles):
+    assert list(threes_util.future_tile_possibilities(max_tile)) == possible_tiles

@@ -6,40 +6,40 @@ import numpy as np
 
 from common.env_common import IllegalMoveError
 
-# The values representing each possible piece type in the state.
+# The values representing each possible tile type in the state.
 EMPTY_SPACE = 0
-PIECE_1 = 1
-PIECE_2 = 2
-PIECE_3 = 3
-PIECE_6 = 4
-PIECE_12 = 5
-PIECE_24 = 6
-PIECE_48 = 7
-PIECE_96 = 8
-PIECE_192 = 9
-PIECE_384 = 10
-PIECE_768 = 11
-PIECE_1536 = 12
-PIECE_3072 = 13
-PIECE_6144 = 14
-PIECE_12288 = 15  # When this piece is created, the game ends automatically.
+TILE_1 = 1
+TILE_2 = 2
+TILE_3 = 3
+TILE_6 = 4
+TILE_12 = 5
+TILE_24 = 6
+TILE_48 = 7
+TILE_96 = 8
+TILE_192 = 9
+TILE_384 = 10
+TILE_768 = 11
+TILE_1536 = 12
+TILE_3072 = 13
+TILE_6144 = 14
+TILE_12288 = 15  # When this tile is created, the game ends automatically.
 
-MAX_PIECE = PIECE_12288
-NUM_FEATURES = MAX_PIECE + 1  # Possible values for each number in the state.
+MAX_TILE = TILE_12288
+NUM_FEATURES = MAX_TILE + 1  # Possible values for each number in the state.
 
-# Indicates possible places where a new piece can be added in the board.
+# Indicates possible places where a new tile can be added in the board.
 # Will not appear in game states output by the environment, but is present
 # in the boards returned by `move_board_preview`.
 # (this is -100 instead of -1 to increase the chances of an IndexError happening
 # if these incomplete boards are mistakenly used as real boards).
-POSSIBLE_FUTURE_PIECE = -100
+POSSIBLE_FUTURE_TILE = -100
 
-# The score for each piece on the final board:
-# EMPTY_SPACE, PIECE_1 and PIECE_2: No points awarded.
-# PIECE_3 (3): 3 = 3**1
-# PIECE_6 (4): 9 == 3**2
-# PIECE_12 (5): 27 == 3**3
-# PIECE_24 (6): 81 == 3**4
+# The score for each tile on the final board:
+# EMPTY_SPACE, TILE_1 and TILE_2: No points awarded.
+# TILE_3 (3): 3 = 3**1
+# TILE_6 (4): 9 == 3**2
+# TILE_12 (5): 27 == 3**3
+# TILE_24 (6): 81 == 3**4
 # ...and so on.
 SCORES = [0, 0, 0] + [3 ** i for i in range(1, 14)]
 
@@ -53,7 +53,7 @@ ACTION_NAMES = ["left", "up", "right", "down"]
 
 
 def move_line_left(line, do_move=True) -> Tuple[bool, int]:
-    """Move pieces towards the left. Return: (moved_bool, score_delta)
+    """Move tiles towards the left. Return: (moved_bool, score_delta)
 
     `line` is modified in-place, unless `do_move` is False.
 
@@ -62,7 +62,7 @@ def move_line_left(line, do_move=True) -> Tuple[bool, int]:
         analyzed but `line` is not modified.
     :return: (moved_bool, score_delta), where moved_bool indicates whether the
         line was (or would be) moved, and score_delta indicates how many points
-        are gained by merging pieces in the line.
+        are gained by merging tiles in the line.
     """
     for i in range(len(line) - 1):
         if line[i] == EMPTY_SPACE and line[i + 1] != EMPTY_SPACE:
@@ -74,17 +74,17 @@ def move_line_left(line, do_move=True) -> Tuple[bool, int]:
 
             break
 
-        elif PIECE_1 <= line[i] <= PIECE_2 and line[i] + line[i + 1] == 3:
+        elif TILE_1 <= line[i] <= TILE_2 and line[i] + line[i + 1] == 3:
             # Merge a 1 and a 2 into a 3.
-            score_delta = SCORES[PIECE_3]  # 1s and 2s are worth 0 points.
+            score_delta = SCORES[TILE_3]  # 1s and 2s are worth 0 points.
             if do_move:
-                line[i] = PIECE_3
+                line[i] = TILE_3
                 line[i + 1 : -1] = line[i + 2 :]
                 line[-1] = EMPTY_SPACE
 
             break
 
-        elif PIECE_3 <= line[i] == line[i + 1]:
+        elif TILE_3 <= line[i] == line[i + 1]:
             score_delta = SCORES[line[i] + 1] - 2 * SCORES[line[i]]
             if do_move:
                 line[i] += 1
@@ -118,7 +118,7 @@ def is_legal_action(board, direction: int):
 
 def is_game_over(board) -> bool:
     """True if there is no possible action in the board."""
-    if PIECE_12288 in board:  # 12... piece
+    if TILE_12288 in board:  # 12... tile
         return True
 
     if any(
@@ -156,43 +156,43 @@ def rotated_boards_view(board, direction: int):
 
 def _move_board(board, direction: int) -> int:
     # Moves the board in-place.
-    # Returns the score_delta and a list of the rows where a new piece can
+    # Returns the score_delta and a list of the rows where a new tile can
     # be added in the last column.
     rotated = rotated_boards_view(board, direction)
 
     # Perform the board moves, store the lines that moved.
     total_score_delta = 0
-    nextpiece_possible_rows = []
+    nexttile_possible_rows = []
     for line in rotated:
         moved, score_delta = move_line_left(line)
         total_score_delta += score_delta
         if moved:
-            nextpiece_possible_rows.append(line)
+            nexttile_possible_rows.append(line)
 
-    if not nextpiece_possible_rows:
+    if not nexttile_possible_rows:
         raise IllegalMoveError
 
-    return total_score_delta, nextpiece_possible_rows
+    return total_score_delta, nexttile_possible_rows
 
 
-def move_board(board, direction: int, piece_to_add: int, np_rand) -> int:
-    """Move the pieces in the board in a given direction, adding a new piece.
+def move_board(board, direction: int, tile_to_add: int, np_rand) -> int:
+    """Move the tiles in the board in a given direction, adding a new tile.
 
     :param board: A 2-dimensional array containing a game board. The array
         will be modified in-place.
     :param direction: The direction to move the board in.
-    :param piece_to_add: The new piece to add to the board.
+    :param tile_to_add: The new tile to add to the board.
     :param np_rand: A `numpy.random.RandomState` instance to use for choosing
-        where to place the new piece.
-    :return: The score gained by any merged pieces in the board.
+        where to place the new tile.
+    :return: The score gained by any merged tiles in the board.
     :raise IllegalMoveError: If the board cannot be moved in the given
         direction.
     """
-    total_score_delta, nextpiece_possible_rows = _move_board(board, direction)
+    total_score_delta, nexttile_possible_rows = _move_board(board, direction)
 
-    # Add a new piece in one of the moved rows.
-    row_to_add = np_rand.choice(len(nextpiece_possible_rows))
-    nextpiece_possible_rows[row_to_add][-1] = piece_to_add
+    # Add a new tile in one of the moved rows.
+    row_to_add = np_rand.choice(len(nexttile_possible_rows))
+    nexttile_possible_rows[row_to_add][-1] = tile_to_add
 
     return total_score_delta
 
@@ -205,30 +205,30 @@ def move_board_preview(board, direction: int) -> int:
     :param direction: The direction to move the board in.
     :return: (moved_board, score_delta), where:
         - moved_board is a new array with the result of moving the board in the
-            given direction. The possible places where a new piece can appear will
-            have the value `POSSIBLE_FUTURE_PIECE`.
-        - score_delta is he score gained by any merged pieces in the board.
+            given direction. The possible places where a new tile can appear will
+            have the value `POSSIBLE_FUTURE_TILE`.
+        - score_delta is he score gained by any merged tiles in the board.
     :raise IllegalMoveError: If the board cannot be moved in the given
         direction.
     """
     """"""
     moved_board = board.copy()
-    total_score_delta, nextpiece_possible_rows = _move_board(moved_board, direction)
-    for row in nextpiece_possible_rows:
-        row[-1] = POSSIBLE_FUTURE_PIECE
+    total_score_delta, nexttile_possible_rows = _move_board(moved_board, direction)
+    for row in nexttile_possible_rows:
+        row[-1] = POSSIBLE_FUTURE_TILE
 
     return moved_board, total_score_delta
 
 
-def future_piece_possibilities(piece_code):
-    """Return the possible future pieces, from the piece value included in the state.
+def future_tile_possibilities(tile_code):
+    """Return the possible future tiles, from the tile value included in the state.
     """
-    if piece_code <= PIECE_6:
-        return [piece_code]
-    return range(max(PIECE_6, piece_code - 2), piece_code + 1)
+    if tile_code <= TILE_6:
+        return [tile_code]
+    return range(max(TILE_6, tile_code - 2), tile_code + 1)
 
 
 def total_score(input):
     """Return the total score value of a line or board."""
-    # Ignore POSSIBLE_FUTURE_PIECE values in the input.
+    # Ignore POSSIBLE_FUTURE_TILE values in the input.
     return sum(SCORES[x] for x in np.array(input).flatten() if x >= 0)
