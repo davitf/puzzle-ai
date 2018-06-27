@@ -58,7 +58,7 @@ from threes.threes_util import (
     TILE_3,
     TILE_24,
     TILE_48,
-    NUM_FEATURES,
+    NUM_STATE_VALUES,
     NUM_ACTIONS,
     is_game_over,
     move_board,
@@ -80,7 +80,7 @@ class ThreesGame(gym.Env):
     action_space = gym.spaces.Discrete(NUM_ACTIONS)
 
     # observation_space depends on board_size, which is set for each instance.
-    # observation_space = gym.spaces.MultiDiscrete([NUM_FEATURES] * STATE_SIZE)
+    # observation_space = gym.spaces.MultiDiscrete([NUM_STATE_VALUES] * STATE_SIZE)
 
     def __init__(self, board_size=4, high_tiles=None):
         """Initialize the environment.
@@ -93,15 +93,13 @@ class ThreesGame(gym.Env):
         """
         self.board_size = board_size
         # Convert high_tile to a one-element list if it is not a list.
-        self.high_tiles = (
-            high_tiles if hasattr(high_tiles, "__len__") else [high_tiles]
-        )
+        self.high_tiles = high_tiles if hasattr(high_tiles, "__len__") else [high_tiles]
 
         self.board_area = board_size * board_size  # Number of tiles in the board.
 
         self.state_size = self.board_area + 1  # All tiles in the board + next tile.
         self.observation_space = gym.spaces.MultiDiscrete(
-            [NUM_FEATURES] * self.state_size
+            [NUM_STATE_VALUES] * self.state_size
         )
 
         self.state = np.zeros(self.state_size, dtype="int")

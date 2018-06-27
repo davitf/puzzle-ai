@@ -25,7 +25,7 @@ TILE_6144 = 14
 TILE_12288 = 15  # When this tile is created, the game ends automatically.
 
 MAX_TILE = TILE_12288
-NUM_FEATURES = MAX_TILE + 1  # Possible values for each number in the state.
+NUM_STATE_VALUES = MAX_TILE + 1  # Possible values for each feature in a state.
 
 # Indicates possible places where a new tile can be added in the board.
 # Will not appear in game states output by the environment, but is present

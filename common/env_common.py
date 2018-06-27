@@ -1,3 +1,6 @@
+"""Common exceptions for Gym environments."""
+
+
 class IllegalMoveError(Exception):
     pass
 

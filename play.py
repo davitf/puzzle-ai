@@ -9,7 +9,7 @@ from common import env_common
 # TODO: choose environment to play.
 import threes.threes_play as game_play
 
-kwargs = {"high_pieces": threes.threes_util.PIECE_768}
+kwargs = {"high_tiles": threes.threes_util.TILE_768}
 
 game = game_play.Env(**kwargs)
 

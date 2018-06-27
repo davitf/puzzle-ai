@@ -19,10 +19,6 @@ def get_items(iter, n):
     return output
 
 
-def check_same_contents(a, b):
-    assert sorted(a) == sorted(b)
-
-
 @pytest.mark.parametrize("input", [([1, 2, 3, 4, 5]), ([10, 10, 10, 10, 1])])
 def test_randomized_order_iter(input):
     it = randomized_order_iter.randomized_order_iter(input)
